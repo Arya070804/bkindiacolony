@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1024"> <!-- Force desktop layout on mobile -->
+  <title>BK Indiacolony Pariwar</title>
+
+  <!-- Cropper.js CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+
+  <style>
+    body { 
+      font-family: Poppins, sans-serif; 
+      text-align: center; 
+      background: #f0f0f0; 
+      margin: 0; 
+      padding: 0;
+      overflow-x: auto; /* allow scroll if screen is smaller */
+    }
+    .box { 
+      background: #fff; 
+      width: 1024px;  /* fixed width same as desktop */
+      margin: 20px auto; 
+      padding: 20px;
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+    }
+    canvas { 
+      width: 100%; 
+      height: auto;
+      margin-top: 10px; 
+      border: 2px solid #ccc; 
+      border-radius: 12px; 
+    }
+    input, button { 
+      width: 100%; 
+      padding: 10px; 
+      margin: 8px 0; 
+      border-radius: 8px;
+      border: 1px solid #aaa; 
+      font-size: 16px; 
+      box-sizing: border-box;
+    }
+    button { 
+      background: #ff6600; 
+      color: white; 
+      border: none; 
+      cursor: pointer; 
+    }
+    button:hover { background: #e65c00; }
+
+    /* Crop Modal */
+    #cropModal {
+      display: none; 
+      position: fixed; 
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center; 
+      align-items: center;
+      z-index: 9999;
+    }
+    #cropModal .modal-content {
+      background: #fff; 
+      padding: 10px; 
+      border-radius: 8px;
+      max-width: 90vw; 
+      max-height: 90vh;
+      display: flex; 
+      flex-direction: column; 
+      align-items: center;
+    }
+    #cropImage { 
+      max-width: 100%; 
+      max-height: 70vh; 
+      display: block; 
+      object-fit: contain; 
+    }
+    .cropper-view-box, .cropper-face { border-radius: 50% !important; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2> BK Indiacolony Pariwar </h2>
+    <input type="file" id="upload" accept="image/*">
+    <input type="text" id="username" placeholder="Enter your name">
+    <canvas id="canvas"></canvas>
+    <button id="download">Download Selfie</button>
+  </div>
+
+  <!-- Crop Modal -->
+  <div id="cropModal">
+    <div class="modal-content">
+      <img id="cropImage">
+      <div style="margin-top:10px;">
+        <button id="cropBtn">Crop & Save</button>
+        <button id="cancelCrop">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cropper.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script>
+    const upload = document.getElementById("upload");
+    const usernameInput = document.getElementById("username");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const downloadBtn = document.getElementById("download");
+
+    let userImage = null;
+    let cropper;
+    const cropModal = document.getElementById("cropModal");
+    const cropImage = document.getElementById("cropImage");
+
+    const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
+    bgImg.src = "https://sikotargraphics.github.io/GDV/8.png";
+
+    const placeholder = new Image();
+    placeholder.crossOrigin = "anonymous";
+    placeholder.src = "https://sikotargraphics.github.io/GDV/1.png";
+    userImage = placeholder;
+
+    function resizeCanvas() {
+      const width = 600;   // fixed desktop size
+      canvas.width = width;
+      canvas.height = width; 
+      drawCanvas();
+    }
+
+    function drawCanvas() {
+      if (!canvas.width) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw background
+      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+      // Draw user photo in circle
+      if (userImage) {
+        const size = canvas.width * 0.25;
+        const x = canvas.width - size - 30;
+        const y = canvas.height - size - 90;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI*2);
+        ctx.clip();
+        ctx.drawImage(userImage, x, y, size, size);
+        ctx.restore();
+
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI*2);
+        ctx.stroke();
+
+        // Draw text if entered
+        if (usernameInput.value.trim() !== "") {
+          const text = usernameInput.value.trim();
+          ctx.font = `bold ${canvas.width * 0.025}px Arial`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          const textWidth = ctx.measureText(text).width;
+          const textX = x + size/2;
+          const textY = y + size + 20;
+
+          // Background box behind text
+          ctx.fillStyle = "#4d0606";
+          ctx.fillRect(textX - textWidth/2 - 8, textY - 15, textWidth + 24, 28);
+
+          // White text
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(text, textX, textY);
+        }
+      }
+    }
+
+    // Upload image + crop
+    upload.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        cropImage.src = ev.target.result;
+        cropModal.style.display = "flex";
+
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(cropImage, {
+          aspectRatio: 1,
+          viewMode: 1,
+          dragMode: "move",
+          background: false,
+          guides: false,
+          autoCropArea: 0.9,
+          zoomOnWheel: true
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("cropBtn").addEventListener("click", () => {
+      const canvasCrop = cropper.getCroppedCanvas({ width: 500, height: 500 });
+      userImage = new Image();
+      userImage.onload = drawCanvas;
+      userImage.src = canvasCrop.toDataURL("image/png");
+      cropModal.style.display = "none";
+      cropper.destroy();
+    });
+
+    document.getElementById("cancelCrop").addEventListener("click", () => {
+      cropModal.style.display = "none";
+      cropper.destroy();
+    });
+
+    usernameInput.addEventListener("input", drawCanvas);
+
+    downloadBtn.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "selfie.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+    bgImg.onload = drawCanvas;
+    placeholder.onload = drawCanvas;
+    resizeCanvas();
+  </script>
+</body>
+</html>
